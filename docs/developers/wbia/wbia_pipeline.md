@@ -615,9 +615,25 @@ ibs.localizer_precision_recall(
 
 The above code will render an image to disk, by default, to the user's desktop.  An example can be seen below for a single Beluga detection model for multiple Non-Maximum Suppression (NMS) thresholds, as configured.  The evaluation plots will show both a Precision-Recall (PR) curve, a Recall-IoU curve, and two confusion matrices.  The Average Precision (AP) and Area Under the Curve (AUC) are provided for each of the configurations.  The best Operating Point (OP) is selected by the closest points on each respective configuration to the best overall performance.  For the PR curve, the best performance point is in the top-right corner.  For the Recall-IoU curve, there is not an ideal OP and points are not plotted.  The confusion matrices are plotted for the best-performing curve (highest AP) and the curve with the highest Precision given a target recall (e.g., 80%).  The plotted points on each curve are the optimized performance and the titles of the confusion matrix show the best configuration and the recommended OP.  The final accuracy for the selected configuration and OP are shown at the bottom.
 
-![Classifier Evaluation Plots](../../../static/img/wbia_detection_eval.jpg)
+![Localizer Evaluation Plots](../../../static/img/wbia_detection_eval.jpg)
 
 It should be noted that a ROC plot cannot be provided for detections.  This is because the concept of a True Negative (TN) is undefined for object detection (i.e., what does it mean to correctly not predict a box where a box shouldn't have been?).  Furthermore, the determination of if a predicted box is a True Positive (TP), a greedy matching algorithm is used to select the highest confidence box for a given Intersection over Union (IoU) threshold and if the species of the ground-truth (GT) and prediction matches.  Any remaining boxes that are not matched are either False Positives (additional boxes) or False Negatives (missed boxes).  The second plot (Recall-IoU) shows the recall curves for each configuration (by selecting the OP that optimizes general performance) and demonstrates how lowering the IoU threshold could potentially increase recall.  The benefit of such an analysis is that the IoU threshold is somewhat arbitrary and, depending on the use case, could be specified at 60% (requiring very accurate boxes) to emphasize the preciseness of the boxes or at 25% (requiring loose boxes) to allow the detector to be treated more like a salient detector (useful for aerial applications).
+
+To visualize the final detections against the ground-truth boxes, use the following code:
+
+```python
+config = {
+    'grid': False,
+    'algo': 'lightnet',
+    'config_filepath': model_tag,
+    'weight_filepath': model_tag,
+    'nms': True,
+    'nms_thresh': 0.50,  # Based on the evaulation plots
+    'sensitivity': 0.50,  # Based on the evaulation plots
+}
+ibs.visualize_ground_truth(config, gid_list=gid_list)
+ibs.visualize_predictions(config, gid_list=gid_list)
+```
 
 ## Annotation Classification
 
@@ -943,6 +959,37 @@ SPECIES_WITH_DETECTORS = (
 ```
 
 The background subtraction code is evaluated qualitatively, not quantitatively by WBIA.  This is because WBIA does not normally store fully segmented ground truth for a given annotation (only the bounding box).  Furthermore, the WBIA interface contains no interface for drawing such segmentation ground-truth.  These limitations mean that it is not possible to perform a complete validation step with accuracy numbers.  That being said, we can evaluate the impact on any ID results with the HotSpotter algorithm when keypoints are weighted by the background mask versus when they are not.  In practice, the coarse background segmentations tend to give a 5-10% improvement in top-k accuracy.
+
+#### Get Relevant Images
+
+To visualize the background masks on held-out test annotations, use the following code:
+
+```python
+from wbia.other.detectfuncs import general_get_imageset_gids
+import utool as ut
+
+# Get all gids
+all_gid_list = ibs.get_valid_gids()
+
+# Filter by reviewed (optional)
+reviewed_list = ibs.get_image_reviewed(all_gid_list)
+reviewed_gid_list = ut.compress(all_gid_list, reviewed_list)
+
+# Filter by test set
+test_gid_list = general_get_imageset_gids(ibs, 'TEST_SET')
+
+# Get final test gids that have been reviewed
+gid_list = sorted(list(set(test_gid_list) & set(reviewed_gid_list)))
+```
+
+#### Render Results
+
+```python
+species_list = [
+    'whale_beluga',
+]
+ibs.background_accuracy_display(category_list=species_list, test_gid_set=gid_list)
+```
 
 ## Annotation of Interest (AoI) Classification
 
@@ -1616,8 +1663,8 @@ INFO:wbia:Preprocess Chips
 
 ```python
 >>> ibs.background_train(
->>>     'zebra_grevys', 
->>>     train_gid_set=train_gid_list, 
+>>>     'zebra_grevys',
+>>>     train_gid_set=train_gid_list,
 >>>     global_limit=100000
 >>> )
 INFO:root:/data/db/_ibsdb/_ibeis_cache/extracted

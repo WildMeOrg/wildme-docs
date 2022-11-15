@@ -154,6 +154,9 @@ module.exports = {
           "researchers/configuration",
         ]
       }
+    ],
+    "Wildbook IA": [
+      "researchers/wbia/wbia_ggr"
     ]
   },
   developerSidebar: {
